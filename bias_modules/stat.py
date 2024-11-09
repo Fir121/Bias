@@ -23,19 +23,19 @@ def chi_square_test(ddesc, df, text_col, class_col): # modified version with wor
             count = df[text_col].str.contains(sanitized_word).groupby(df[class_col]).sum()
         except:  # noqa: E722
             continue
-        if count.sum() <= int(0.01*len(df)):
+        if count.sum() <= int(0.02*len(df)):
             continue
         deviation = count.std() / count.mean()
-        if deviation > 1:
+        if deviation > 0.9:
             new_df[sanitized_word] = {"std": deviation, **count.to_dict()}
     
     new_df = [{**{"word": key}, **value} for key, value in new_df.items()]
     new_df = pd.DataFrame(new_df)
-    new_df = new_df.sort_values("std", ascending=False)[:10]
+    new_df = new_df.sort_values("std", ascending=False)
 
     model = ModelHandler()
 
-    for index, row in new_df.iterrows():
+    for index, row in new_df[:15].iterrows():
         word = row["word"]
         fdist = []
         for class_ in classes:
@@ -50,5 +50,23 @@ def chi_square_test(ddesc, df, text_col, class_col): # modified version with wor
     new_df = new_df.reset_index(drop=True)
     return new_df
 
+def text_length_classifier_deviation(df, text_col, class_col):
+    classes = df[class_col].unique().tolist()
 
+    new_df = []
 
+    for class_ in classes:
+        dt = {"class": class_}
+
+        avg = df[df[class_col] == class_][text_col].str.len().mean()
+        dt["length"] = avg
+
+        new_df.append(dt)
+    
+    new_df = pd.DataFrame(new_df)
+    
+    if new_df["length"].std() / new_df["length"].mean() > 0.1:
+        return new_df, False
+    return new_df, True
+
+# do a sentence based stat also
