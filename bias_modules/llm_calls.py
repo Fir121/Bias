@@ -18,7 +18,7 @@ class ModelHandler:
         ]
 
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-3.5-turbo" if os.environ.get("DEBUG")=="true" else "gpt-4o",
             messages=messages,
         )
 
