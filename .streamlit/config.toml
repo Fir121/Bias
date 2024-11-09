@@ -1,0 +1,7 @@
+[server]
+
+headless = true
+runOnSave = true
+allowRunOnSave = true
+fileWatcherType = "auto"
+maxUploadSize = 500
