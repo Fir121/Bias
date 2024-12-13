@@ -69,7 +69,7 @@ def dataset_uploader():
                 st.write(length_df)
 
 def main():
-    st.title("Bias Detector")
+    st.title("DetBias")
     st.write("A bias detection tool (mitigation coming soon)")
     
     if "formstate" not in st.session_state:
