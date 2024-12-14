@@ -47,3 +47,12 @@ For example in a dataset about food reviews, words like \"delicious\" or \"tasty
 and would be VALID but words like \"female\" or \"waiter\" may be causing a harmful, unintentional bias and would be considered INVALID\
 \n\
 Only output the word INVALID or VALID in your response. Do not provide an explanation."
+    
+    @staticmethod
+    def get_col_name(column_names, type_to_find):
+        col_sentence = ", ".join(column_names)
+
+        return f"I have a dataset with the following columns: {col_sentence}.\
+I want to know which column is most likely to be the {type_to_find}.\
+\n\nOutput the name of the {type_to_find} only as a single word.\
+\n\nFor example, if the column is named serial_no then output only serial_no"
