@@ -1,6 +1,12 @@
 import pandas as pd
 from bias_modules.llm_calls import ModelHandler, Constants
 
+def get_accuracy(df, class_col, pred_col):
+    print(class_col, pred_col)
+    correct = df[df[class_col] == df[pred_col]].shape[0]
+    total = df.shape[0]
+    return correct / total * 100
+
 def class_balance_checker(df, class_col):
     class_dist = df[class_col].value_counts()
 

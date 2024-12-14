@@ -2,7 +2,12 @@ from nicegui import ui
 import pandas as pd
 from bias_modules.llm_calls import ModelHandler, Constants
 import asyncio
-from bias_modules.stat import class_balance_checker, chi_square_test, text_length_classifier_deviation
+from bias_modules.stat import class_balance_checker, chi_square_test, text_length_classifier_deviation, get_accuracy
+import joblib
+import os
+
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+import keras
 
 # GLOBALS
 df = text_col = label_col = ddesc = None
@@ -16,6 +21,20 @@ def pandas_to_table(dataframe):
         columns=[{'name': col, 'label': col, 'field': col} for col in dataframe.columns],
         rows=dataframe.to_dict('records'),
     )
+
+def get_modelinfo_from_path(path, model_type):
+    if model_type == "SciKit":
+        mdl = joblib.load(path)
+        data = str(mdl) + "\n\n"
+        for step in mdl.named_steps:
+            data += f"Step: {step}\n"
+            data += f"{mdl.named_steps[step].get_params()}\n"
+        return data
+    elif model_type == "TensorFlow" or model_type == "Keras":
+        mdl = keras.models.load_model(path)
+        return mdl.summary()
+    elif model_type == "Custom":
+        return model_desc
 
 def header_bar():
     with ui.header().classes('items-baseline justify-between'):
@@ -218,7 +237,6 @@ async def stage2():
                 with open('temp2.csv', 'wb') as file:
                     file.write(f.content.read())
                 results_df = pd.read_csv('temp2.csv')
-                colselect.refresh()
             
             def handle_file_reject2():
                 ui.notify('Rejected!')
@@ -314,7 +332,6 @@ async def stage2():
                 with open(fn, 'wb') as file:
                     file.write(f.content.read())
                 model = fn
-                colselect.refresh()
             
             def handle_file_reject():
                 ui.notify('Rejected!')
@@ -405,6 +422,20 @@ async def output_stage_2():
 
     load = ui.spinner(size='lg').classes('mx-auto')
     ll = ui.label('Processing, please wait, this might take a while...').classes('text-center w-full')
+
+    loop = asyncio.get_running_loop()
+
+    model_desc = await loop.run_in_executor(None, get_modelinfo_from_path, model, model_type.value)
+    accuracy = await loop.run_in_executor(None, get_accuracy, results_df, label_col_p.value, pred_col.value)
+
+    load.delete()
+    ll.delete()
+
+    ui.label('Model Information:')
+    ui.label(model_desc)
+
+    ui.label('Model Accuracy:')
+    ui.label(f'{accuracy}%')
 
 @ui.refreshable
 async def stage2_switcher():
