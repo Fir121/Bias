@@ -3,3 +3,8 @@ __pycache__
 .env
 temp.py
 data
+temp.csv
+temp2.csv
+*.pkl
+*.h5
+*.pth

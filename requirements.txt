@@ -3,3 +3,6 @@ openai==1.54.3
 python-dotenv==1.0.1
 matplotlib==3.9.2
 scipy==1.14.1 
+nicegui==2.8.1
+scikit-learn==1.6.0
+tensorflow==2.18.0
