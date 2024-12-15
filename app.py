@@ -219,7 +219,7 @@ async def output_stage_1():
         ui.label('❌ The dataset is imbalanced in terms of text length')
         pandas_to_table(length_df)
 
-    prompt = Constants.pre_analysis_prompt(ddesc, df, text_col.value, label_col.value, balanced, class_dist, chi_df, lbalanced, length_df)
+    prompt = Constants.pre_analysis_prompt(ddesc, text_col.value, label_col.value, balanced, class_dist, chi_df, lbalanced, length_df)
     await chat_dialog(prompt, 1)
 
 @ui.refreshable
@@ -437,61 +437,40 @@ async def chat_dialog(initial_prompt, usage):
                 {"role": "system", "content": Constants.detbias_sysprompt()},
                 {"role": "user", "content": initial_prompt},
             ]
+        
+    c_his = message_history if usage == 1 else message_history_2
 
     with ui.card(align_items="stretch").classes('w-full'):
         async def send_message():
             message = ip.value
             bt.disable()
-            if usage == 1:
-                message_history.append({"role": "user", "content": message})
-            else:
-                message_history_2.append({"role": "user", "content": message})
+            c_his.append({"role": "user", "content": message})
             chat_dialog.refresh()
 
         with ui.column():
             ip = ui.input(placeholder='Type your message...').classes('w-full')
             bt = ui.button('Send', on_click=send_message)
-
-            ip.disable()
             bt.disable()
 
         with ui.scroll_area().classes('w-full h-[40vh]'):
             with ui.row():
                 load = ui.spinner(size='lg').classes('mx-auto')
 
-                if usage == 1:
-                    for message in message_history[2:][::-1]:
-                        if message['role'] == 'user':
-                            ui.chat_message(message['content'], name='user', avatar='https://robohash.org/super2', sent=True).classes('ml-auto')
-                        else:
-                            ui.chat_message(markdown.markdown(message['content']), name='DetBias', avatar='https://robohash.org/ui', text_html=True).classes('mr-auto')
-                    
-                    if message_history[-1]['role'] == 'assistant':
-                        load.delete()
-                        ip.enable()
-                        bt.enable()
+                for message in c_his[2:][::-1]:
+                    if message['role'] == 'user':
+                        ui.chat_message(message['content'], name='user', avatar='https://robohash.org/super2', sent=True).classes('w-full')
                     else:
-                        response = await loop.run_in_executor(None, llm.message_ai, message_history)
-                        message_history.append({"role": "assistant", "content": response})
-                        load.delete()
-                        chat_dialog.refresh()
-
+                        ui.label("DetBias' Response").classes('text-sm text-gray-500')
+                        ui.markdown(message['content']).classes('w-full')
+                
+                if c_his[-1]['role'] == 'assistant':
+                    load.delete()
+                    bt.enable()
                 else:
-                    for message in message_history_2[2:][::-1]:
-                        if message['role'] == 'user':
-                            ui.chat_message(message['content'], name='user', avatar='https://robohash.org/super2', sent=True).classes('ml-auto')
-                        else:
-                            ui.chat_message(markdown.markdown(message['content']), name='DetBias', avatar='https://robohash.org/ui', text_html=True).classes('mr-auto')
-                    
-                    if message_history_2[-1]['role'] == 'assistant':
-                        load.delete()
-                        ip.enable()
-                        bt.enable()
-                    else:
-                        response = await loop.run_in_executor(None, llm.message_ai, message_history_2)
-                        message_history_2.append({"role": "assistant", "content": response})
-                        load.delete()
-                        chat_dialog.refresh()
+                    response = await loop.run_in_executor(None, llm.message_ai, c_his)
+                    c_his.append({"role": "assistant", "content": response})
+                    load.delete()
+                    chat_dialog.refresh()
         
 
 async def output_stage_2():

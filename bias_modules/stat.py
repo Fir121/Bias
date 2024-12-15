@@ -62,7 +62,7 @@ def chi_square_test(ddesc, df, text_col, class_col): # modified version with wor
         
     new_df = new_df.drop(columns=["std"])
     new_df = new_df.reset_index(drop=True)
-    return new_df
+    return new_df[:15]
 
 def text_length_classifier_deviation(df, text_col, class_col):
     classes = df[class_col].unique().tolist()
