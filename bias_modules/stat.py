@@ -1,8 +1,16 @@
 import pandas as pd
 from bias_modules.llm_calls import ModelHandler, Constants
 
+def demographic_parity(df, class_col, pred_col):
+    predicted_positive_rate_sr = df.groupby(class_col)[pred_col].mean()
+    predicted_positive_rate = predicted_positive_rate_sr.reset_index()
+
+    if predicted_positive_rate_sr.std() > 0.35:  # Threshold can be adjusted
+        return True, predicted_positive_rate_sr.std(), predicted_positive_rate
+    else:
+        return False, predicted_positive_rate_sr.std(), predicted_positive_rate
+
 def get_accuracy(df, class_col, pred_col):
-    print(class_col, pred_col)
     correct = df[df[class_col] == df[pred_col]].shape[0]
     total = df.shape[0]
     return correct / total * 100

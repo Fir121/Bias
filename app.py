@@ -2,9 +2,10 @@ from nicegui import ui
 import pandas as pd
 from bias_modules.llm_calls import ModelHandler, Constants
 import asyncio
-from bias_modules.stat import class_balance_checker, chi_square_test, text_length_classifier_deviation, get_accuracy
+from bias_modules.stat import class_balance_checker, chi_square_test, text_length_classifier_deviation, get_accuracy, demographic_parity
 import joblib
 import os
+import markdown
 
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 import keras
@@ -15,6 +16,9 @@ display_output = False
 
 model = model_type = model_desc = results_df = text_col_p = label_col_p = pred_col = None
 display_output_2 = False
+
+message_history = []
+message_history_2 = []
 
 def pandas_to_table(dataframe):
     return ui.  table(
@@ -215,6 +219,9 @@ async def output_stage_1():
         ui.label('❌ The dataset is imbalanced in terms of text length')
         pandas_to_table(length_df)
 
+    prompt = Constants.pre_analysis_prompt(ddesc, df, text_col.value, label_col.value, balanced, class_dist, chi_df, lbalanced, length_df)
+    await chat_dialog(prompt, 1)
+
 @ui.refreshable
 async def stage1_switcher():
     if not display_output:
@@ -412,6 +419,81 @@ async def stage2():
             
             await colselect2()
 
+@ui.refreshable
+async def chat_dialog(initial_prompt, usage):
+    global message_history, message_history_2
+
+    llm = ModelHandler()
+    loop = asyncio.get_running_loop()
+    if usage == 1:
+        if not message_history:
+            message_history = [
+                {"role": "system", "content": Constants.detbias_sysprompt()},
+                {"role": "user", "content": initial_prompt},
+            ]
+    else:
+        if not message_history_2:
+            message_history_2 = [
+                {"role": "system", "content": Constants.detbias_sysprompt()},
+                {"role": "user", "content": initial_prompt},
+            ]
+
+    with ui.card(align_items="stretch").classes('w-full'):
+        async def send_message():
+            message = ip.value
+            bt.disable()
+            if usage == 1:
+                message_history.append({"role": "user", "content": message})
+            else:
+                message_history_2.append({"role": "user", "content": message})
+            chat_dialog.refresh()
+
+        with ui.column():
+            ip = ui.input(placeholder='Type your message...').classes('w-full')
+            bt = ui.button('Send', on_click=send_message)
+
+            ip.disable()
+            bt.disable()
+
+        with ui.scroll_area().classes('w-full h-[40vh]'):
+            with ui.row():
+                load = ui.spinner(size='lg').classes('mx-auto')
+
+                if usage == 1:
+                    for message in message_history[2:][::-1]:
+                        if message['role'] == 'user':
+                            ui.chat_message(message['content'], name='user', avatar='https://robohash.org/super2', sent=True).classes('ml-auto')
+                        else:
+                            ui.chat_message(markdown.markdown(message['content']), name='DetBias', avatar='https://robohash.org/ui', text_html=True).classes('mr-auto')
+                    
+                    if message_history[-1]['role'] == 'assistant':
+                        load.delete()
+                        ip.enable()
+                        bt.enable()
+                    else:
+                        response = await loop.run_in_executor(None, llm.message_ai, message_history)
+                        message_history.append({"role": "assistant", "content": response})
+                        load.delete()
+                        chat_dialog.refresh()
+
+                else:
+                    for message in message_history_2[2:][::-1]:
+                        if message['role'] == 'user':
+                            ui.chat_message(message['content'], name='user', avatar='https://robohash.org/super2', sent=True).classes('ml-auto')
+                        else:
+                            ui.chat_message(markdown.markdown(message['content']), name='DetBias', avatar='https://robohash.org/ui', text_html=True).classes('mr-auto')
+                    
+                    if message_history_2[-1]['role'] == 'assistant':
+                        load.delete()
+                        ip.enable()
+                        bt.enable()
+                    else:
+                        response = await loop.run_in_executor(None, llm.message_ai, message_history_2)
+                        message_history_2.append({"role": "assistant", "content": response})
+                        load.delete()
+                        chat_dialog.refresh()
+        
+
 async def output_stage_2():
     def cancel():
         global display_output_2
@@ -427,15 +509,21 @@ async def output_stage_2():
 
     model_desc = await loop.run_in_executor(None, get_modelinfo_from_path, model, model_type.value)
     accuracy = await loop.run_in_executor(None, get_accuracy, results_df, label_col_p.value, pred_col.value)
+    demographic_parity_flag, df_std, demographic_parity_df = await loop.run_in_executor(None, demographic_parity, results_df, label_col_p.value, pred_col.value)
 
     load.delete()
     ll.delete()
 
-    ui.label('Model Information:')
-    ui.label(model_desc)
+    ui.label(f'Model Accuracy: {accuracy}%')
 
-    ui.label('Model Accuracy:')
-    ui.label(f'{accuracy}%')
+    if demographic_parity_flag:
+        ui.label(f'❌ The model has a demographic parity issue with a standard deviation of {df_std}')
+        pandas_to_table(demographic_parity_df)
+    else:
+        ui.label('✅ The model does not have a demographic parity issue')
+
+    prompt = Constants.post_analysis_prompt(model_desc, model_type.value, accuracy, df_std, text_col_p.value, label_col_p.value, pred_col.value)
+    await chat_dialog(prompt, 2)
 
 @ui.refreshable
 async def stage2_switcher():
